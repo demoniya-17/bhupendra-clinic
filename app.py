@@ -1,32 +1,25 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import json
 import os
 from datetime import datetime
 from flask_mail import Mail, Message
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 app = Flask(__name__)
 
 # ==========================================
-# EMAIL CONFIGURATION (use environment variables on Render)
+# EMAIL CONFIGURATION
 # ==========================================
-# On Render, set these as Environment Variables in Dashboard:
-# MAIL_USERNAME = your-email@gmail.com
-# MAIL_PASSWORD = your-app-password
-# YOUR_EMAIL = your-email@gmail.com
-
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
-
-# Use environment variables (safer for production)
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'bhupiender2502@gmail.com')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'znqb edvb jwck uszb')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', 'bhupiender2502@gmail.com')
 
 mail = Mail(app)
-
-# Your email where you want to receive notifications
 YOUR_EMAIL = os.environ.get('YOUR_EMAIL', 'bhupiender2502@gmail.com')
 
 # ==========================================
@@ -35,7 +28,11 @@ YOUR_EMAIL = os.environ.get('YOUR_EMAIL', 'bhupiender2502@gmail.com')
 
 @app.route('/')
 def index():
-    return app.send_static_file('index.html')
+    """Serve index.html from root folder"""
+    try:
+        return send_from_directory(BASE_DIR, 'index.html')
+    except Exception as e:
+        return f"Error: {str(e)}. Make sure index.html is in the same folder as app.py", 500
 
 @app.route('/api/appointment', methods=['POST'])
 def submit_appointment():
@@ -50,20 +47,19 @@ def submit_appointment():
                     'message': f'{field} is required'
                 }), 400
 
-        if not os.path.exists('appointments'):
-            os.makedirs('appointments')
+        appointments_dir = os.path.join(BASE_DIR, 'appointments')
+        if not os.path.exists(appointments_dir):
+            os.makedirs(appointments_dir)
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f'appointments/appointment_{timestamp}.json'
+        filename = os.path.join(appointments_dir, f'appointment_{timestamp}.json')
 
         data['serverReceivedAt'] = datetime.now().isoformat()
 
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        # ==========================================
-        # SEND EMAIL NOTIFICATION
-        # ==========================================
+        # Send email notification
         email_sent = False
         email_error_msg = None
 
@@ -165,13 +161,14 @@ def test_email():
 @app.route('/api/appointments', methods=['GET'])
 def list_appointments():
     try:
-        if not os.path.exists('appointments'):
+        appointments_dir = os.path.join(BASE_DIR, 'appointments')
+        if not os.path.exists(appointments_dir):
             return jsonify({'appointments': []})
 
         appointments = []
-        for filename in sorted(os.listdir('appointments'), reverse=True):
+        for filename in sorted(os.listdir(appointments_dir), reverse=True):
             if filename.endswith('.json'):
-                with open(f'appointments/{filename}', 'r', encoding='utf-8') as f:
+                with open(os.path.join(appointments_dir, filename), 'r', encoding='utf-8') as f:
                     appointments.append(json.load(f))
 
         return jsonify({
