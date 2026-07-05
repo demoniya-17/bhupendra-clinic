@@ -22,17 +22,8 @@ def after_request(response):
 # ==========================================
 # TELEGRAM CONFIGURATION
 # ==========================================
-# Step 1: Open Telegram and search for "BotFather"
-# Step 2: Start chat and send: /newbot
-# Step 3: Give your bot a name (e.g., "Bhupendra Clinic Bot")
-# Step 4: Give username (e.g., bhupendra_clinic_bot) - must end with _bot
-# Step 5: BotFather will give you a TOKEN - copy it
-# Step 6: Start your bot by clicking the link BotFather gives
-# Step 7: To get your Chat ID, visit: https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
-#         Look for "chat":{"id":123456789 - that number is your CHAT_ID
-
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', 'YOUR_CHAT_ID_HERE')
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '8697310770:AAFdSoN7Ux3SiatE8o1qSLxVICFSi2mTEuc')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '7472435105')
 
 # ==========================================
 # TELEGRAM SEND FUNCTION
@@ -114,7 +105,6 @@ def submit_appointment():
 
             service_name = service_names.get(data.get('serviceInterest', ''), 'General Inquiry')
 
-            # Format Telegram message with Markdown
             telegram_message = f"""🆕 *New Appointment Request*
 
 👤 *Name:* {data['fullName']}
@@ -158,18 +148,11 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'telegram_configured': TELEGRAM_BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE' and TELEGRAM_CHAT_ID != 'YOUR_CHAT_ID_HERE'
+        'telegram_configured': True
     })
 
 @app.route('/api/test-telegram', methods=['GET'])
 def test_telegram():
-    """Test Telegram integration"""
-    if TELEGRAM_BOT_TOKEN == 'YOUR_BOT_TOKEN_HERE' or TELEGRAM_CHAT_ID == 'YOUR_CHAT_ID_HERE':
-        return jsonify({
-            'success': False,
-            'error': 'Telegram not configured. Please set up BotFather first.'
-        }), 500
-
     try:
         message = "🧪 *Test message* from Bhupendra Clinic website. Telegram integration is working!"
         success, result = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
@@ -177,7 +160,7 @@ def test_telegram():
         if success:
             return jsonify({
                 'success': True,
-                'message': f'Test message sent to Telegram'
+                'message': 'Test message sent to Telegram'
             })
         else:
             return jsonify({
