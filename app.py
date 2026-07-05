@@ -9,6 +9,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
 
 # ==========================================
+# CORS SUPPORT (for cross-origin requests)
+# ==========================================
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+# ==========================================
 # EMAIL CONFIGURATION
 # ==========================================
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -32,12 +42,22 @@ def index():
     try:
         return send_from_directory(BASE_DIR, 'index.html')
     except Exception as e:
-        return f"Error: {str(e)}. Make sure index.html is in the same folder as app.py", 500
+        return f"Error: {str(e)}", 500
 
-@app.route('/api/appointment', methods=['POST'])
+@app.route('/api/appointment', methods=['POST', 'OPTIONS'])
 def submit_appointment():
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
     try:
         data = request.get_json()
+
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No data received'
+            }), 400
 
         required_fields = ['fullName', 'email', 'phone']
         for field in required_fields:
