@@ -20,31 +20,29 @@ def after_request(response):
     return response
 
 # ==========================================
-# WHATSAPP CONFIGURATION (CallMeBot)
+# TELEGRAM CONFIGURATION
 # ==========================================
-# Step 1: Open https://api.callmebot.com/whatsapp.php in browser
-# Step 2: Enter your WhatsApp number with country code (e.g., +919582082682)
-# Step 3: Click "Send" to get verification code on WhatsApp
-# Step 4: Enter verification code on website
-# Step 5: Copy the API key shown
-# Step 6: Update YOUR_API_KEY below
+# Step 1: Open Telegram and search for "BotFather"
+# Step 2: Start chat and send: /newbot
+# Step 3: Give your bot a name (e.g., "Bhupendra Clinic Bot")
+# Step 4: Give username (e.g., bhupendra_clinic_bot) - must end with _bot
+# Step 5: BotFather will give you a TOKEN - copy it
+# Step 6: Start your bot by clicking the link BotFather gives
+# Step 7: To get your Chat ID, visit: https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
+#         Look for "chat":{"id":123456789 - that number is your CHAT_ID
 
-YOUR_PHONE = os.environ.get('WHATSAPP_PHONE', '+919582082682')  # Aapka WhatsApp number
-YOUR_API_KEY = os.environ.get('WHATSAPP_API_KEY', 'YOUR_API_KEY_HERE')  # CallMeBot se milega
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', 'YOUR_CHAT_ID_HERE')
 
 # ==========================================
-# WHATSAPP SEND FUNCTION
+# TELEGRAM SEND FUNCTION
 # ==========================================
-def send_whatsapp_message(phone, api_key, message):
-    """Send WhatsApp message using CallMeBot API"""
+def send_telegram_message(token, chat_id, message):
+    """Send Telegram message using Bot API"""
     try:
-        # URL encode the message
         encoded_message = urllib.parse.quote(message)
+        url = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={encoded_message}&parse_mode=Markdown"
 
-        # CallMeBot API URL
-        url = f"https://api.callmebot.com/whatsapp.php?phone={phone}&text={encoded_message}&apikey={api_key}"
-
-        # Send request
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=30) as response:
             result = response.read().decode('utf-8')
@@ -59,7 +57,6 @@ def send_whatsapp_message(phone, api_key, message):
 
 @app.route('/')
 def index():
-    """Serve index.html from root folder"""
     try:
         return send_from_directory(BASE_DIR, 'index.html')
     except Exception as e:
@@ -101,10 +98,10 @@ def submit_appointment():
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         # ==========================================
-        # SEND WHATSAPP NOTIFICATION
+        # SEND TELEGRAM NOTIFICATION
         # ==========================================
-        whatsapp_sent = False
-        whatsapp_error = None
+        telegram_sent = False
+        telegram_error = None
 
         try:
             service_names = {
@@ -117,8 +114,8 @@ def submit_appointment():
 
             service_name = service_names.get(data.get('serviceInterest', ''), 'General Inquiry')
 
-            # Format WhatsApp message
-            whatsapp_message = f"""🆕 *New Appointment Request*
+            # Format Telegram message with Markdown
+            telegram_message = f"""🆕 *New Appointment Request*
 
 👤 *Name:* {data['fullName']}
 📧 *Email:* {data['email']}
@@ -131,24 +128,23 @@ def submit_appointment():
 
 📞 Please contact within 24 hours."""
 
-            # Send WhatsApp
-            success, result = send_whatsapp_message(YOUR_PHONE, YOUR_API_KEY, whatsapp_message)
+            success, result = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, telegram_message)
 
             if success:
-                whatsapp_sent = True
+                telegram_sent = True
             else:
-                whatsapp_error = result
+                telegram_error = result
 
         except Exception as e:
-            whatsapp_error = str(e)
-            whatsapp_sent = False
+            telegram_error = str(e)
+            telegram_sent = False
 
         return jsonify({
             'success': True,
             'message': 'Appointment request submitted successfully! We will contact you within 24 hours.',
             'appointmentId': timestamp,
-            'whatsappNotification': whatsapp_sent,
-            'whatsappError': whatsapp_error
+            'telegramNotification': telegram_sent,
+            'telegramError': telegram_error
         })
 
     except Exception as e:
@@ -162,26 +158,26 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'whatsapp_configured': YOUR_API_KEY != 'YOUR_API_KEY_HERE'
+        'telegram_configured': TELEGRAM_BOT_TOKEN != 'YOUR_BOT_TOKEN_HERE' and TELEGRAM_CHAT_ID != 'YOUR_CHAT_ID_HERE'
     })
 
-@app.route('/api/test-whatsapp', methods=['GET'])
-def test_whatsapp():
-    """Test WhatsApp integration"""
-    if YOUR_API_KEY == 'YOUR_API_KEY_HERE':
+@app.route('/api/test-telegram', methods=['GET'])
+def test_telegram():
+    """Test Telegram integration"""
+    if TELEGRAM_BOT_TOKEN == 'YOUR_BOT_TOKEN_HERE' or TELEGRAM_CHAT_ID == 'YOUR_CHAT_ID_HERE':
         return jsonify({
             'success': False,
-            'error': 'API key not configured. Please set up CallMeBot first.'
+            'error': 'Telegram not configured. Please set up BotFather first.'
         }), 500
 
     try:
-        message = "🧪 Test message from Bhupendra Clinic website. WhatsApp integration is working!"
-        success, result = send_whatsapp_message(YOUR_PHONE, YOUR_API_KEY, message)
+        message = "🧪 *Test message* from Bhupendra Clinic website. Telegram integration is working!"
+        success, result = send_telegram_message(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message)
 
         if success:
             return jsonify({
                 'success': True,
-                'message': f'Test WhatsApp sent to {YOUR_PHONE}'
+                'message': f'Test message sent to Telegram'
             })
         else:
             return jsonify({
