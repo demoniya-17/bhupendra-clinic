@@ -14,6 +14,10 @@
       font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       background: #f8faff;
       color: #1a2a3a;
@@ -557,10 +561,10 @@
       <h1><i class="fas fa-leaf" style="color: #7fc1db;"></i> Bhupendra <span>Diet & Wellness</span></h1>
     </div>
     <div class="nav-links">
-      <a href="#services">Services</a>
-      <a href="#proof">Success Stories</a>
-      <a href="#about">About</a>
-      <a href="#appointment" class="btn-appt"><i class="fas fa-calendar-check"></i> Book Appointment</a>
+      <a href="#services" target="_self">Services</a>
+      <a href="#proof" target="_self">Success Stories</a>
+      <a href="#about" target="_self">About</a>
+      <a href="#appointment" class="btn-appt" target="_self"><i class="fas fa-calendar-check"></i> Book Appointment</a>
     </div>
   </div>
 </header>
@@ -712,9 +716,9 @@
   <footer class="footer">
     <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin-bottom: 20px;">
       <div><strong>Quick Links</strong><br>
-        <a href="#services" style="color: #1f4f68; text-decoration: none;">Services</a><br>
-        <a href="#proof" style="color: #1f4f68; text-decoration: none;">Success Stories</a><br>
-        <a href="#appointment" style="color: #1f4f68; text-decoration: none;">Book Appointment</a>
+        <a href="#services" style="color: #1f4f68; text-decoration: none;" target="_self">Services</a><br>
+        <a href="#proof" style="color: #1f4f68; text-decoration: none;" target="_self">Success Stories</a><br>
+        <a href="#appointment" style="color: #1f4f68; text-decoration: none;" target="_self">Book Appointment</a>
       </div>
       <div><strong>Contact</strong><br>
         <i class="fas fa-envelope"></i> bhupiender2502@gmail.com<br>
@@ -742,24 +746,43 @@ document.getElementById('appointmentForm').addEventListener('submit', async func
   submitBtn.disabled = true;
 
   const formData = {
-    fullName: document.getElementById('fullName').value,
-    email: document.getElementById('email').value,
-    phone: document.getElementById('phone').value,
+    fullName: document.getElementById('fullName').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    phone: document.getElementById('phone').value.trim(),
     serviceInterest: document.getElementById('serviceInterest').value,
-    message: document.getElementById('message').value,
+    message: document.getElementById('message').value.trim(),
     submittedAt: new Date().toISOString()
   };
 
+  // Get the base URL (works on both localhost and Render)
+  const baseUrl = window.location.origin;
+  const apiUrl = baseUrl + '/api/appointment';
+
+  console.log('Submitting to:', apiUrl);
+  console.log('Form data:', formData);
+
   try {
-    const response = await fetch('/api/appointment', {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify(formData)
     });
 
-    const result = await response.json();
+    console.log('Response status:', response.status);
+
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      const text = await response.text();
+      console.error('Failed to parse JSON:', text);
+      throw new Error('Server returned invalid response. Please try again.');
+    }
+
+    console.log('Response:', result);
 
     if (result.success) {
       alert('✅ ' + result.message);
@@ -768,8 +791,8 @@ document.getElementById('appointmentForm').addEventListener('submit', async func
       alert('❌ Error: ' + (result.message || 'Something went wrong'));
     }
   } catch (error) {
-    alert('❌ Network error. Please try again later.');
-    console.error('Error:', error);
+    console.error('Fetch error:', error);
+    alert('❌ Network error: ' + error.message + '\n\nPlease check your internet connection and try again. If the problem persists, contact us directly at +91 9582082682.');
   } finally {
     submitBtn.innerHTML = originalText;
     submitBtn.disabled = false;
