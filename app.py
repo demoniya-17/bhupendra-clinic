@@ -2,14 +2,15 @@ from flask import Flask, request, jsonify, send_from_directory
 import json
 import os
 from datetime import datetime
-from flask_mail import Mail, Message
+import urllib.request
+import urllib.parse
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = Flask(__name__)
 
 # ==========================================
-# CORS SUPPORT (for cross-origin requests)
+# CORS SUPPORT
 # ==========================================
 @app.after_request
 def after_request(response):
@@ -19,18 +20,38 @@ def after_request(response):
     return response
 
 # ==========================================
-# EMAIL CONFIGURATION
+# WHATSAPP CONFIGURATION (CallMeBot)
 # ==========================================
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USE_SSL'] = False
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'bhupiender2502@gmail.com')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'znqb edvb jwck uszb')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', 'bhupiender2502@gmail.com')
+# Step 1: Open https://api.callmebot.com/whatsapp.php in browser
+# Step 2: Enter your WhatsApp number with country code (e.g., +919582082682)
+# Step 3: Click "Send" to get verification code on WhatsApp
+# Step 4: Enter verification code on website
+# Step 5: Copy the API key shown
+# Step 6: Update YOUR_API_KEY below
 
-mail = Mail(app)
-YOUR_EMAIL = os.environ.get('YOUR_EMAIL', 'bhupiender2502@gmail.com')
+YOUR_PHONE = os.environ.get('WHATSAPP_PHONE', '+919582082682')  # Aapka WhatsApp number
+YOUR_API_KEY = os.environ.get('WHATSAPP_API_KEY', 'YOUR_API_KEY_HERE')  # CallMeBot se milega
+
+# ==========================================
+# WHATSAPP SEND FUNCTION
+# ==========================================
+def send_whatsapp_message(phone, api_key, message):
+    """Send WhatsApp message using CallMeBot API"""
+    try:
+        # URL encode the message
+        encoded_message = urllib.parse.quote(message)
+
+        # CallMeBot API URL
+        url = f"https://api.callmebot.com/whatsapp.php?phone={phone}&text={encoded_message}&apikey={api_key}"
+
+        # Send request
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = response.read().decode('utf-8')
+            return True, result
+
+    except Exception as e:
+        return False, str(e)
 
 # ==========================================
 # ROUTES
@@ -46,7 +67,6 @@ def index():
 
 @app.route('/api/appointment', methods=['POST', 'OPTIONS'])
 def submit_appointment():
-    # Handle preflight OPTIONS request
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'}), 200
 
@@ -67,6 +87,7 @@ def submit_appointment():
                     'message': f'{field} is required'
                 }), 400
 
+        # Save appointment
         appointments_dir = os.path.join(BASE_DIR, 'appointments')
         if not os.path.exists(appointments_dir):
             os.makedirs(appointments_dir)
@@ -79,9 +100,11 @@ def submit_appointment():
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-        # Send email notification
-        email_sent = False
-        email_error_msg = None
+        # ==========================================
+        # SEND WHATSAPP NOTIFICATION
+        # ==========================================
+        whatsapp_sent = False
+        whatsapp_error = None
 
         try:
             service_names = {
@@ -94,56 +117,38 @@ def submit_appointment():
 
             service_name = service_names.get(data.get('serviceInterest', ''), 'General Inquiry')
 
-            email_subject = f"New Appointment Request - {data['fullName']}"
+            # Format WhatsApp message
+            whatsapp_message = f"""🆕 *New Appointment Request*
 
-            email_body = f"""Hello Dr. Bhupendra,
+👤 *Name:* {data['fullName']}
+📧 *Email:* {data['email']}
+📱 *Phone:* {data['phone']}
+🩺 *Service:* {service_name}
+⏰ *Time:* {datetime.now().strftime('%d %b %Y, %I:%M %p')}
 
-You have received a new appointment request from your website!
+📝 *Message:*
+{data.get('message', 'No message')}
 
-PATIENT DETAILS
-----------------
-Name: {data['fullName']}
-Email: {data['email']}
-Phone: {data['phone']}
-Service: {service_name}
-Submitted At: {datetime.now().strftime('%d %B %Y, %I:%M %p')}
+📞 Please contact within 24 hours."""
 
-MESSAGE / HEALTH GOALS
-----------------------
-{data.get('message', 'No message provided')}
+            # Send WhatsApp
+            success, result = send_whatsapp_message(YOUR_PHONE, YOUR_API_KEY, whatsapp_message)
 
-Next Steps:
-- Contact the patient within 24 hours
-- Confirm appointment date and time
-- Prepare their medical history form
+            if success:
+                whatsapp_sent = True
+            else:
+                whatsapp_error = result
 
-Bhupendra Diet & Wellness Clinic
-WZ-09/Shop no.09 New Mahavir Nagar, New Delhi 110018
-Phone: +91 9582082682
-
----
-This is an automated notification from your clinic website.
-            """
-
-            msg = Message(
-                subject=email_subject,
-                recipients=[YOUR_EMAIL],
-                body=email_body
-            )
-
-            mail.send(msg)
-            email_sent = True
-
-        except Exception as email_error:
-            email_error_msg = str(email_error)
-            email_sent = False
+        except Exception as e:
+            whatsapp_error = str(e)
+            whatsapp_sent = False
 
         return jsonify({
             'success': True,
             'message': 'Appointment request submitted successfully! We will contact you within 24 hours.',
             'appointmentId': timestamp,
-            'emailNotification': email_sent,
-            'emailError': email_error_msg
+            'whatsappNotification': whatsapp_sent,
+            'whatsappError': whatsapp_error
         })
 
     except Exception as e:
@@ -156,22 +161,34 @@ This is an automated notification from your clinic website.
 def health_check():
     return jsonify({
         'status': 'healthy',
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'whatsapp_configured': YOUR_API_KEY != 'YOUR_API_KEY_HERE'
     })
 
-@app.route('/api/test-email', methods=['GET'])
-def test_email():
-    try:
-        msg = Message(
-            subject='Test Email - Bhupendra Clinic Website',
-            recipients=[YOUR_EMAIL],
-            body='This is a test email from your clinic website. If you received this, email is working!'
-        )
-        mail.send(msg)
+@app.route('/api/test-whatsapp', methods=['GET'])
+def test_whatsapp():
+    """Test WhatsApp integration"""
+    if YOUR_API_KEY == 'YOUR_API_KEY_HERE':
         return jsonify({
-            'success': True,
-            'message': f'Test email sent to {YOUR_EMAIL}'
-        })
+            'success': False,
+            'error': 'API key not configured. Please set up CallMeBot first.'
+        }), 500
+
+    try:
+        message = "🧪 Test message from Bhupendra Clinic website. WhatsApp integration is working!"
+        success, result = send_whatsapp_message(YOUR_PHONE, YOUR_API_KEY, message)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Test WhatsApp sent to {YOUR_PHONE}'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result
+            }), 500
+
     except Exception as e:
         return jsonify({
             'success': False,
